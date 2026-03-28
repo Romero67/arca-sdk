@@ -495,7 +495,7 @@ export class WsfeService {
     /**
      * Obtiene el próximo número de comprobante disponible (FECompUltimoAutorizado + 1)
      */
-    private async getNextInvoiceNumber(type: InvoiceType): Promise<number> {
+    public async getNextInvoiceNumber(type: InvoiceType): Promise<number> {
         const soapRequest = this.buildLastInvoiceRequest(type);
         const endpoint = getWsfeEndpoint(this.config.environment);
 
