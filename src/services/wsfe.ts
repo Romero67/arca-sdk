@@ -4,6 +4,7 @@ import { ArcaError, ArcaValidationError } from '../types/common';
 import type {
     Buyer,
     CAEResponse,
+    CbteAsociado,
     InvoiceDetails,
     InvoiceItem,
     IssueInvoiceRequest,
@@ -259,6 +260,97 @@ export class WsfeService {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Emisión de Notas de Crédito
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /**
+     * Emite una Nota de Crédito C (consumidor final, sin discriminación de IVA).
+     * REQUIERE los comprobantes asociados (facturas que se están acreditando).
+     */
+    async issueNotaCreditoC(params: {
+        items: InvoiceItem[];
+        concept?: BillingConcept;
+        date?: Date;
+        taxConditionBuyer: TaxCondition;
+        cbteAsociados: CbteAsociado[];
+    }): Promise<CAEResponse> {
+        const total = round(calculateTotal(params.items));
+
+        return this.issueDocument({
+            type: InvoiceType.NOTA_CREDITO_C,
+            concept: params.concept || BillingConcept.PRODUCTS,
+            total,
+            date: params.date,
+            buyer: {
+                docType: TaxIdType.FINAL_CONSUMER,
+                docNumber: '0',
+            },
+            taxCondition: params.taxConditionBuyer || TaxCondition.FINAL_CONSUMER,
+            items: params.items,
+            cbteAsociados: params.cbteAsociados,
+        });
+    }
+
+    /**
+     * Emite una Nota de Crédito B (con IVA discriminado).
+     * REQUIERE `vatRate` en todos los items y los comprobantes asociados.
+     */
+    async issueNotaCreditoB(params: {
+        items: InvoiceItem[];
+        buyer: Buyer;
+        concept?: BillingConcept;
+        date?: Date;
+        includesVAT?: boolean;
+        taxConditionBuyer?: TaxCondition;
+        cbteAsociados: CbteAsociado[];
+    }): Promise<CAEResponse> {
+        this.validateItemsWithVAT(params.items);
+        const includesVAT = params.includesVAT || false;
+        const vatData = this.calculateVATByRate(params.items, includesVAT);
+
+        return this.issueDocument({
+            type: InvoiceType.NOTA_CREDITO_B,
+            concept: params.concept || BillingConcept.PRODUCTS,
+            items: params.items,
+            buyer: params.buyer,
+            date: params.date,
+            vatData,
+            includesVAT,
+            taxCondition: params.taxConditionBuyer || TaxCondition.FINAL_CONSUMER,
+            cbteAsociados: params.cbteAsociados,
+        });
+    }
+
+    /**
+     * Emite una Nota de Crédito A (Responsable Inscripto, con IVA discriminado).
+     * REQUIERE `vatRate` en todos los items y los comprobantes asociados.
+     */
+    async issueNotaCreditoA(params: {
+        items: InvoiceItem[];
+        buyer: Buyer;
+        concept?: BillingConcept;
+        date?: Date;
+        includesVAT?: boolean;
+        cbteAsociados: CbteAsociado[];
+    }): Promise<CAEResponse> {
+        this.validateItemsWithVAT(params.items);
+        const includesVAT = params.includesVAT || false;
+        const vatData = this.calculateVATByRate(params.items, includesVAT);
+
+        return this.issueDocument({
+            type: InvoiceType.NOTA_CREDITO_A,
+            concept: params.concept || BillingConcept.PRODUCTS,
+            items: params.items,
+            buyer: params.buyer,
+            date: params.date,
+            vatData,
+            includesVAT,
+            taxCondition: TaxCondition.REGISTERED_TAXPAYER,
+            cbteAsociados: params.cbteAsociados,
+        });
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // Consultas
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -454,6 +546,7 @@ export class WsfeService {
             total,
             vatData: request.vatData,
             taxCondition: request.taxCondition,
+            cbteAsociados: request.cbteAsociados,
         });
 
         // 4. Send to ARCA
@@ -624,6 +717,7 @@ export class WsfeService {
         total: number;
         vatData?: IssueInvoiceRequest['vatData'];
         taxCondition: TaxCondition;
+        cbteAsociados?: CbteAsociado[];
     }): string {
         const dateStr = params.date.toISOString().split('T')[0].replace(/-/g, '');
 
@@ -639,6 +733,20 @@ export class WsfeService {
         </ar:AlicIva>`;
             });
             vatXml += '\n      </ar:Iva>';
+        }
+
+        let cbteAsocXml = '';
+        if (params.cbteAsociados && params.cbteAsociados.length > 0) {
+            cbteAsocXml = '<ar:CbtesAsoc>';
+            params.cbteAsociados.forEach((cbte) => {
+                cbteAsocXml += `
+        <ar:CbteAsoc>
+          <ar:Tipo>${cbte.tipo}</ar:Tipo>
+          <ar:PtoVta>${cbte.puntoVenta}</ar:PtoVta>
+          <ar:Nro>${cbte.numero}</ar:Nro>
+        </ar:CbteAsoc>`;
+            });
+            cbteAsocXml += '\n      </ar:CbtesAsoc>';
         }
 
         return `<?xml version="1.0" encoding="UTF-8"?>
@@ -675,6 +783,7 @@ export class WsfeService {
             <ar:ImpTrib>0.00</ar:ImpTrib>
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
+            ${cbteAsocXml}
             ${vatXml}
           </ar:FECAEDetRequest>
         </ar:FeDetReq>

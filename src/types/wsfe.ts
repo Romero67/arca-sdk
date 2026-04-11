@@ -16,8 +16,11 @@ export interface WsfeConfig extends ArcaConfig {
  */
 export enum InvoiceType {
     FACTURA_A = 1,
+    NOTA_CREDITO_A = 3,
     FACTURA_B = 6,
+    NOTA_CREDITO_B = 8,
     FACTURA_C = 11,
+    NOTA_CREDITO_C = 13,
     TICKET_A = 81,
     TICKET_B = 82,
     TICKET_C = 83,
@@ -108,6 +111,18 @@ export interface Buyer {
 }
 
 /**
+ * Comprobante asociado (para Notas de Crédito/Débito)
+ */
+export interface CbteAsociado {
+    /** Tipo de comprobante asociado */
+    tipo: number;
+    /** Punto de venta del comprobante asociado */
+    puntoVenta: number;
+    /** Número del comprobante asociado */
+    numero: number;
+}
+
+/**
  * Request para emitir comprobante
  */
 export interface IssueInvoiceRequest {
@@ -133,6 +148,8 @@ export interface IssueInvoiceRequest {
     date?: Date;
     /** Condicion del iva del comprador */
     taxCondition: TaxCondition;
+    /** Comprobantes asociados (requerido para Notas de Crédito/Débito) */
+    cbteAsociados?: CbteAsociado[];
 }
 
 /**
