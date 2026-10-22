@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WsfeService } from '../../src/services/wsfe';
 import { callArcaApi } from '../../src/utils/network';
-import { InvoiceType, BillingConcept, TaxIdType } from '../../src/types/wsfe';
+import { InvoiceType, BillingConcept, TaxCondition, TaxIdType } from '../../src/types/wsfe';
 
 vi.mock('../../src/utils/network', () => ({
     callArcaApi: vi.fn(),
@@ -234,6 +234,35 @@ describe('WsfeService', () => {
         it('single 21% rate with net prices keeps its previous amounts (1000 + 210 = 1210)', async () => {
             const a = await sentAmounts([{ quantity: 1, unitPrice: 1000, vatRate: 21 }], false);
             expect(a).toEqual({ total: 121000, net: 100000, vat: 21000, bases: [100000], vatAmounts: [21000] });
+        });
+    });
+
+    describe('TaxCondition catalogue (CondicionIVAReceptorId)', () => {
+        it('matches the ARCA codes', () => {
+            expect(TaxCondition.REGISTERED_TAXPAYER).toBe(1);
+            expect(TaxCondition.EXEMPT).toBe(4);
+            expect(TaxCondition.FINAL_CONSUMER).toBe(5);
+            expect(TaxCondition.MONOTAX_PAYER).toBe(6);
+            expect(TaxCondition.UNCATEGORIZED).toBe(7);
+            expect(TaxCondition.FOREIGN_SUPPLIER).toBe(8);
+            expect(TaxCondition.FOREIGN_CLIENT).toBe(9);
+            expect(TaxCondition.VAT_EXEMPT_LAW_19640).toBe(10);
+            expect(TaxCondition.SOCIAL_MONOTAX).toBe(13);
+            expect(TaxCondition.VAT_NOT_REACHED).toBe(15);
+            expect(TaxCondition.PROMOTED_INDEPENDENT_MONOTAX).toBe(16);
+        });
+
+        it('the deprecated VAT_NOT_APPLICABLE ("No Alcanzado") now sends 15, not 10', async () => {
+            expect(TaxCondition.VAT_NOT_APPLICABLE).toBe(15);
+            mockCalls(6);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await wsfe.issueInvoiceB({
+                items: [{ description: 'x', quantity: 1, unitPrice: 1000, vatRate: 21 }],
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+                taxConditionBuyer: TaxCondition.VAT_NOT_APPLICABLE,
+            });
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            expect(body).toContain('<ar:CondicionIVAReceptorId>15</ar:CondicionIVAReceptorId>');
         });
     });
 

@@ -57,21 +57,25 @@ export enum TaxIdType {
 }
 
 /**
- * Condición de IVA del Receptor
- * Acorde AFIP/ARCA RG 5616.
+ * Condición de IVA del Receptor (CondicionIVAReceptorId).
+ * Acorde AFIP/ARCA RG 5616. El catálogo no es correlativo: 2, 3, 11, 12 y 14 no existen.
+ * Fuente de verdad: FEParamGetCondicionIvaReceptor.
  */
 export enum TaxCondition {
-    /** 1 - Registered Taxpayer (Responsable Inscripto) */
+    /** 1 - Registered Taxpayer (IVA Responsable Inscripto) */
     REGISTERED_TAXPAYER = 1,
 
-    /** 4 - Exempt (IVA Exento) */
+    /** 4 - Exempt (IVA Sujeto Exento) */
     EXEMPT = 4,
 
     /** 5 - Final Consumer (Consumidor Final) */
     FINAL_CONSUMER = 5,
 
-    /** 6 - Simple Taxpayer / Monotax (Monotributista) */
+    /** 6 - Simple Taxpayer / Monotax (Responsable Monotributo) */
     MONOTAX_PAYER = 6,
+
+    /** 7 - Uncategorized (Sujeto No Categorizado) */
+    UNCATEGORIZED = 7,
 
     /** 8 - Foreign Supplier (Proveedor del Exterior) */
     FOREIGN_SUPPLIER = 8,
@@ -79,11 +83,24 @@ export enum TaxCondition {
     /** 9 - Foreign Client (Cliente del Exterior) */
     FOREIGN_CLIENT = 9,
 
-    /** 10 - VAT Not Applicable (IVA No Alcanzado) */
-    VAT_NOT_APPLICABLE = 10,
+    /** 10 - VAT exempt under Law 19.640 (IVA Liberado – Ley N° 19.640) */
+    VAT_EXEMPT_LAW_19640 = 10,
 
     /** 13 - Social Monotax (Monotributista Social) */
     SOCIAL_MONOTAX = 13,
+
+    /** 15 - VAT Not Reached (IVA No Alcanzado) */
+    VAT_NOT_REACHED = 15,
+
+    /** 16 - Promoted Independent Worker Monotax (Monotributo Trabajador Independiente Promovido) */
+    PROMOTED_INDEPENDENT_MONOTAX = 16,
+
+    /**
+     * @deprecated Use `VAT_NOT_REACHED`. It used to be 10, which ARCA defines as
+     * "IVA Liberado – Ley N° 19.640"; "IVA No Alcanzado" is 15.
+     */
+    // biome-ignore lint/suspicious/noDuplicateEnumValues: deprecated alias of VAT_NOT_REACHED
+    VAT_NOT_APPLICABLE = 15,
 }
 
 /**

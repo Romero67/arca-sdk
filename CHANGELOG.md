@@ -11,6 +11,11 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 - Con ítems de distintas alícuotas (por ejemplo 21% y 10.5%), la suma de `BaseImp`/`Importe` de `AlicIva` podía diferir en un centavo de `ImpNeto`/`ImpIVA` y ARCA rechazaba el comprobante (errores 10061/10051).
 - Ahora cada alícuota se redondea una sola vez (con IVA incluido: IVA = total de la alícuota − base) y `ImpNeto`, `ImpIVA` e `ImpTotal` salen de la suma de ese desglose.
 
+### 🐛 Bugfix — Catálogo de condición IVA del receptor
+
+- `TaxCondition.VAT_NOT_APPLICABLE` ("IVA No Alcanzado") enviaba el código 10, que en ARCA es "IVA Liberado – Ley N° 19.640". Ahora vale 15 y queda como alias deprecado de `VAT_NOT_REACHED`.
+- Se agregan `UNCATEGORIZED` (7), `VAT_EXEMPT_LAW_19640` (10), `VAT_NOT_REACHED` (15) y `PROMOTED_INDEPENDENT_MONOTAX` (16).
+
 ---
 
 ## [1.0.4] — 2026-02-27
