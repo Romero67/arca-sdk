@@ -79,6 +79,8 @@ function mockCalls(caeType = 83): void {
 describe('WsfeService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Drop queued mockResolvedValueOnce answers a failing test did not consume.
+        (callArcaApi as any).mockReset();
     });
 
     describe('constructor validation', () => {
@@ -234,6 +236,60 @@ describe('WsfeService', () => {
         it('single 21% rate with net prices keeps its previous amounts (1000 + 210 = 1210)', async () => {
             const a = await sentAmounts([{ quantity: 1, unitPrice: 1000, vatRate: 21 }], false);
             expect(a).toEqual({ total: 121000, net: 100000, vat: 21000, bases: [100000], vatAmounts: [21000] });
+        });
+    });
+
+    describe('FECAESolicitar request follows the wsfev1 schema', () => {
+        // xs:sequence of FECAEDetRequest in the wsfev1 WSDL (only the elements this SDK sends).
+        const XSD_ORDER = [
+            'Concepto', 'DocTipo', 'DocNro', 'CbteDesde', 'CbteHasta', 'CbteFch',
+            'ImpTotal', 'ImpTotConc', 'ImpNeto', 'ImpOpEx', 'ImpTrib', 'ImpIVA',
+            'MonId', 'MonCotiz', 'CondicionIVAReceptorId', 'CbtesAsoc', 'Iva',
+        ];
+
+        function detElements(body: string): string[] {
+            const det = body.split('<ar:FECAEDetRequest>')[1].split('</ar:FECAEDetRequest>')[0];
+            const names: string[] = [];
+            let depth = 0;
+            for (const m of det.matchAll(/<(\/?)ar:(\w+)>/g)) {
+                if (m[1]) {
+                    depth--;
+                } else {
+                    if (depth === 0) names.push(m[2]);
+                    depth++;
+                }
+            }
+            return names;
+        }
+
+        it('Factura B: elements are in XSD order', async () => {
+            mockCalls(6);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await wsfe.issueInvoiceB({
+                items: [{ description: 'x', quantity: 1, unitPrice: 1210, vatRate: 21 }],
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+                includesVAT: true,
+            });
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            const sent = detElements(body);
+            expect(sent).toEqual(XSD_ORDER.filter((n) => sent.includes(n)));
+            expect(sent).toContain('CondicionIVAReceptorId');
+            expect(sent).toContain('Iva');
+        });
+
+        it('Nota de Crédito B: elements are in XSD order, CbtesAsoc before Iva', async () => {
+            mockCalls(8);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await wsfe.issueNotaCreditoB({
+                items: [{ description: 'x', quantity: 1, unitPrice: 1210, vatRate: 21 }],
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+                includesVAT: true,
+                cbteAsociados: [{ tipo: 6, puntoVenta: 4, numero: 10 }],
+            });
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            const sent = detElements(body);
+            expect(sent).toEqual(XSD_ORDER.filter((n) => sent.includes(n)));
+            expect(sent).toContain('CbtesAsoc');
         });
     });
 

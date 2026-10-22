@@ -16,6 +16,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 - `TaxCondition.VAT_NOT_APPLICABLE` ("IVA No Alcanzado") enviaba el código 10, que en ARCA es "IVA Liberado – Ley N° 19.640". Ahora vale 15 y queda como alias deprecado de `VAT_NOT_REACHED`.
 - Se agregan `UNCATEGORIZED` (7), `VAT_EXEMPT_LAW_19640` (10), `VAT_NOT_REACHED` (15) y `PROMOTED_INDEPENDENT_MONOTAX` (16).
 
+### 🐛 Bugfix — Orden de los campos en FECAESolicitar
+
+- Los campos de `FECAEDetRequest` siguen la secuencia del XSD de wsfev1: `ImpTrib` antes de `ImpIVA` y `CondicionIVAReceptorId` después de `MonCotiz`. Los importes enviados no cambian.
+
 ---
 
 ## [1.0.4] — 2026-02-27

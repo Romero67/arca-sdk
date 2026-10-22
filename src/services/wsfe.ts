@@ -755,6 +755,7 @@ export class WsfeService {
             cbteAsocXml += '\n      </ar:CbtesAsoc>';
         }
 
+        // FECAEDetRequest children must follow the wsfev1 xs:sequence.
         return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
                   xmlns:ar="http://ar.gov.afip.dif.FEV1/">
@@ -780,15 +781,15 @@ export class WsfeService {
             <ar:CbteDesde>${params.invoiceNumber}</ar:CbteDesde>
             <ar:CbteHasta>${params.invoiceNumber}</ar:CbteHasta>
             <ar:CbteFch>${dateStr}</ar:CbteFch>
-            <ar:CondicionIVAReceptorId>${params.taxCondition}</ar:CondicionIVAReceptorId>
             <ar:ImpTotal>${params.total.toFixed(2)}</ar:ImpTotal>
             <ar:ImpTotConc>0.00</ar:ImpTotConc>
             <ar:ImpNeto>${params.net.toFixed(2)}</ar:ImpNeto>
             <ar:ImpOpEx>0.00</ar:ImpOpEx>
-            <ar:ImpIVA>${params.vat.toFixed(2)}</ar:ImpIVA>
             <ar:ImpTrib>0.00</ar:ImpTrib>
+            <ar:ImpIVA>${params.vat.toFixed(2)}</ar:ImpIVA>
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
+            <ar:CondicionIVAReceptorId>${params.taxCondition}</ar:CondicionIVAReceptorId>
             ${cbteAsocXml}
             ${vatXml}
           </ar:FECAEDetRequest>
