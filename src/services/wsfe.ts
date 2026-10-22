@@ -648,7 +648,7 @@ export class WsfeService {
         if (missingVAT.length > 0) {
             throw new ArcaValidationError('Esta operación requiere `vatRate` en todos los items', {
                 itemsMissingVAT: missingVAT.map((i) => i.description),
-                hint: 'Agregá vatRate a cada item (21, 10.5, 27, o 0)',
+                hint: 'Agregá vatRate a cada item (21, 10.5, 27, 5, 2.5 o 0)',
             });
         }
     }
@@ -693,8 +693,11 @@ export class WsfeService {
      * Mapea alícuota % al código interno de ARCA
      */
     private getVATCode(percentage: number): number {
+        // AlicIva Id per FEParamGetTiposIva.
         const map: Record<number, number> = {
             0: 3,
+            2.5: 9,
+            5: 8,
             10.5: 4,
             21: 5,
             27: 6,
@@ -703,7 +706,7 @@ export class WsfeService {
         const code = map[percentage];
         if (code === undefined) {
             throw new ArcaValidationError(`Alícuota IVA inválida: ${percentage}%`, {
-                validRates: [0, 10.5, 21, 27],
+                validRates: [0, 2.5, 5, 10.5, 21, 27],
                 hint: 'Usá una de las alícuotas oficiales de Argentina',
             });
         }

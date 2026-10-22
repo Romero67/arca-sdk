@@ -20,6 +20,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 - Los campos de `FECAEDetRequest` siguen la secuencia del XSD de wsfev1: `ImpTrib` antes de `ImpIVA` y `CondicionIVAReceptorId` después de `MonCotiz`. Los importes enviados no cambian.
 
+### ✨ Alícuotas 5% y 2,5%
+
+- `vatRate` acepta 5 (Id 8) y 2.5 (Id 9).
+
 ---
 
 ## [1.0.4] — 2026-02-27

@@ -293,6 +293,35 @@ describe('WsfeService', () => {
         });
     });
 
+    describe('VAT rates', () => {
+        async function sentAlicIvaIds(vatRate: number): Promise<string[]> {
+            mockCalls(6);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await wsfe.issueInvoiceB({
+                items: [{ description: 'x', quantity: 1, unitPrice: 1000, vatRate }],
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+            });
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            const iva = body.split('<ar:Iva>')[1];
+            return [...iva.matchAll(/<ar:Id>(\d+)<\/ar:Id>/g)].map((m) => m[1]);
+        }
+
+        it.each([
+            [0, '3'], [10.5, '4'], [21, '5'], [27, '6'], [5, '8'], [2.5, '9'],
+        ])('%s%% is sent as AlicIva Id %s', async (rate, id) => {
+            expect(await sentAlicIvaIds(rate)).toEqual([id]);
+        });
+
+        it('rejects a rate ARCA does not have', async () => {
+            mockCalls(6);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await expect(wsfe.issueInvoiceB({
+                items: [{ description: 'x', quantity: 1, unitPrice: 1000, vatRate: 15 }],
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+            })).rejects.toThrow('Alícuota IVA inválida: 15%');
+        });
+    });
+
     describe('TaxCondition catalogue (CondicionIVAReceptorId)', () => {
         it('matches the ARCA codes', () => {
             expect(TaxCondition.REGISTERED_TAXPAYER).toBe(1);

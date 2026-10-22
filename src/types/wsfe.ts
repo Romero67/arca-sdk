@@ -113,7 +113,7 @@ export interface InvoiceItem {
     quantity: number;
     /** Precio unitario */
     unitPrice: number;
-    /** Alícuota IVA % (0, 10.5, 21, 27) */
+    /** Alícuota IVA % (0, 2.5, 5, 10.5, 21, 27) */
     vatRate?: number;
 }
 
