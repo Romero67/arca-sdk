@@ -154,6 +154,89 @@ describe('WsfeService', () => {
         });
     });
 
+    describe('amounts sent to ARCA add up to the cent', () => {
+        const cents = (v: string) => Math.round(Number(v) * 100);
+        const tag = (xml: string, name: string) =>
+            [...xml.matchAll(new RegExp(`<ar:${name}>([^<]*)</ar:${name}>`, 'g'))].map((m) => m[1]);
+
+        /** Issues a Factura B and returns the amounts of the FECAESolicitar body. */
+        async function sentAmounts(
+            items: { quantity: number; unitPrice: number; vatRate: number }[],
+            includesVAT: boolean,
+        ) {
+            mockCalls(6);
+            const wsfe = new WsfeService(BASE_CONFIG);
+            await wsfe.issueInvoiceB({
+                items: items.map((i) => ({ description: 'x', ...i })),
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+                includesVAT,
+            });
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            return {
+                total: cents(tag(body, 'ImpTotal')[0]),
+                net: cents(tag(body, 'ImpNeto')[0]),
+                vat: cents(tag(body, 'ImpIVA')[0]),
+                bases: tag(body, 'BaseImp').map(cents),
+                vatAmounts: tag(body, 'Importe').map(cents),
+            };
+        }
+
+        function expectConsistent(a: Awaited<ReturnType<typeof sentAmounts>>) {
+            expect(a.bases.reduce((s, b) => s + b, 0)).toBe(a.net);
+            expect(a.vatAmounts.reduce((s, b) => s + b, 0)).toBe(a.vat);
+            expect(a.net + a.vat).toBe(a.total);
+        }
+
+        it('mixed 21% + 10.5% with VAT included: AlicIva sums match ImpNeto/ImpIVA and ImpTotal is what was charged', async () => {
+            const a = await sentAmounts(
+                [
+                    { quantity: 1, unitPrice: 1000, vatRate: 21 },
+                    { quantity: 1, unitPrice: 1000, vatRate: 10.5 },
+                ],
+                true,
+            );
+            expectConsistent(a);
+            expect(a.total).toBe(200000);
+        });
+
+        it('mixed rates with VAT included stay consistent across many carts', async () => {
+            for (let p21 = 101; p21 < 1500; p21 += 97) {
+                for (let p105 = 103; p105 < 1500; p105 += 89) {
+                    const a = await sentAmounts(
+                        [
+                            { quantity: 3, unitPrice: p21 + 0.37, vatRate: 21 },
+                            { quantity: 2, unitPrice: p105 + 0.59, vatRate: 10.5 },
+                        ],
+                        true,
+                    );
+                    expectConsistent(a);
+                    expect(a.total).toBe(Math.round((3 * (p21 + 0.37) + 2 * (p105 + 0.59)) * 100));
+                }
+            }
+        });
+
+        it('mixed rates with net prices: AlicIva sums match and ImpTotal = ImpNeto + ImpIVA', async () => {
+            const a = await sentAmounts(
+                [
+                    { quantity: 3, unitPrice: 826.45, vatRate: 21 },
+                    { quantity: 7, unitPrice: 904.98, vatRate: 10.5 },
+                ],
+                false,
+            );
+            expectConsistent(a);
+        });
+
+        it('single 21% rate with VAT included keeps its previous amounts (1210 = 1000 + 210)', async () => {
+            const a = await sentAmounts([{ quantity: 1, unitPrice: 1210, vatRate: 21 }], true);
+            expect(a).toEqual({ total: 121000, net: 100000, vat: 21000, bases: [100000], vatAmounts: [21000] });
+        });
+
+        it('single 21% rate with net prices keeps its previous amounts (1000 + 210 = 1210)', async () => {
+            const a = await sentAmounts([{ quantity: 1, unitPrice: 1000, vatRate: 21 }], false);
+            expect(a).toEqual({ total: 121000, net: 100000, vat: 21000, bases: [100000], vatAmounts: [21000] });
+        });
+    });
+
     describe('checkStatus (static)', () => {
         it('should return server status', async () => {
             const mockStatusXml = `<?xml version="1.0" encoding="UTF-8"?>

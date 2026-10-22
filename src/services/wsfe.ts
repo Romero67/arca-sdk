@@ -522,7 +522,15 @@ export class WsfeService {
         let net = total;
         let vat = 0;
 
-        if (request.items && request.items.length > 0) {
+        if (request.vatData && request.vatData.length > 0) {
+            // A/B and their notes: totals come from the per-rate breakdown so
+            // ImpNeto = Σ BaseImp, ImpIVA = Σ Importe, ImpTotal = ImpNeto + ImpIVA.
+            const netCents = request.vatData.reduce((s, e) => s + Math.round(e.taxBase * 100), 0);
+            const vatCents = request.vatData.reduce((s, e) => s + Math.round(e.amount * 100), 0);
+            net = netCents / 100;
+            vat = vatCents / 100;
+            total = (netCents + vatCents) / 100;
+        } else if (request.items && request.items.length > 0) {
             const includesVAT = request.includesVAT || false;
             net = round(calculateSubtotal(request.items, includesVAT));
             vat = round(calculateVAT(request.items, includesVAT));
@@ -656,31 +664,29 @@ export class WsfeService {
         taxBase: number;
         amount: number;
     }[] {
-        const byRate = new Map<number, { base: number; amount: number }>();
-
+        // Sum of quantity * unitPrice per rate (gross when includesVAT, net otherwise).
+        const byRate = new Map<number, number>();
         items.forEach((item) => {
             const rate = item.vatRate || 0;
-            let netPrice = item.unitPrice;
-
-            if (includesVAT && rate) {
-                netPrice = item.unitPrice / (1 + rate / 100);
-            }
-
-            const base = item.quantity * netPrice;
-            const amount = (base * rate) / 100;
-
-            const current = byRate.get(rate) || { base: 0, amount: 0 };
-            byRate.set(rate, {
-                base: current.base + base,
-                amount: current.amount + amount,
-            });
+            byRate.set(rate, (byRate.get(rate) || 0) + item.quantity * item.unitPrice);
         });
 
-        return Array.from(byRate.entries()).map(([rate, values]) => ({
-            rate,
-            taxBase: round(values.base),
-            amount: round(values.amount),
-        }));
+        // Each rate is rounded once, in cents, so that base + VAT is exactly
+        // the rounded gross of that rate. ARCA requires the AlicIva entries to
+        // add up to ImpNeto/ImpIVA, which issueDocument derives from them.
+        return Array.from(byRate.entries()).map(([rate, sum]) => {
+            let baseCents: number;
+            let amountCents: number;
+            if (includesVAT) {
+                const grossCents = Math.round(sum * 100);
+                baseCents = Math.round((sum / (1 + rate / 100)) * 100);
+                amountCents = grossCents - baseCents;
+            } else {
+                baseCents = Math.round(sum * 100);
+                amountCents = Math.round((sum * rate) / 100 * 100);
+            }
+            return { rate, taxBase: baseCents / 100, amount: amountCents / 100 };
+        });
     }
 
     /**
