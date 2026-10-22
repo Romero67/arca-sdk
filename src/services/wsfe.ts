@@ -233,7 +233,7 @@ export class WsfeService {
     }
 
     /**
-     * Emite una Factura A (Responsable Inscripto a Responsable Inscripto, con IVA discriminado).
+     * Emite una Factura A (Responsable Inscripto a Responsable Inscripto o monotributista, con IVA discriminado).
      * REQUIERE `vatRate` en todos los items.
      */
     async issueInvoiceA(params: {
@@ -242,6 +242,8 @@ export class WsfeService {
         concept?: BillingConcept;
         date?: Date;
         includesVAT?: boolean;
+        /** Receiver VAT condition. Defaults to Responsable Inscripto (1); use MONOTAX_PAYER (6) for a monotributista (RG 5003). */
+        taxConditionBuyer?: TaxCondition;
     }): Promise<CAEResponse> {
         this.validateItemsWithVAT(params.items);
         const includesVAT = params.includesVAT || false;
@@ -255,7 +257,7 @@ export class WsfeService {
             date: params.date,
             vatData,
             includesVAT,
-            taxCondition: TaxCondition.REGISTERED_TAXPAYER,
+            taxCondition: params.taxConditionBuyer || TaxCondition.REGISTERED_TAXPAYER,
         });
     }
 
@@ -332,6 +334,8 @@ export class WsfeService {
         date?: Date;
         includesVAT?: boolean;
         cbteAsociados: CbteAsociado[];
+        /** Receiver VAT condition. Defaults to Responsable Inscripto (1); use MONOTAX_PAYER (6) for a monotributista (RG 5003). */
+        taxConditionBuyer?: TaxCondition;
     }): Promise<CAEResponse> {
         this.validateItemsWithVAT(params.items);
         const includesVAT = params.includesVAT || false;
@@ -345,7 +349,7 @@ export class WsfeService {
             date: params.date,
             vatData,
             includesVAT,
-            taxCondition: TaxCondition.REGISTERED_TAXPAYER,
+            taxCondition: params.taxConditionBuyer || TaxCondition.REGISTERED_TAXPAYER,
             cbteAsociados: params.cbteAsociados,
         });
     }

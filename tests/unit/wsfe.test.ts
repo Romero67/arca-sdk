@@ -351,6 +351,44 @@ describe('WsfeService', () => {
         });
     });
 
+    describe('receiver VAT condition on Factura A and Nota de Crédito A', () => {
+        const items = [{ description: 'x', quantity: 1, unitPrice: 1000, vatRate: 21 }];
+        const buyer = { docType: TaxIdType.CUIT, docNumber: '20987654321' };
+        const cbteAsociados = [{ tipo: 1, puntoVenta: 1, numero: 10 }];
+        const sentCondition = () =>
+            (callArcaApi as any).mock.calls.at(-1)[1].body.match(
+                /<ar:CondicionIVAReceptorId>(\d+)<\/ar:CondicionIVAReceptorId>/,
+            )?.[1];
+
+        it('Factura A to a monotributista sends condition 6', async () => {
+            mockCalls(1);
+            await new WsfeService(BASE_CONFIG).issueInvoiceA({
+                items, buyer, taxConditionBuyer: TaxCondition.MONOTAX_PAYER,
+            });
+            expect(sentCondition()).toBe('6');
+        });
+
+        it('Factura A without a condition still sends 1 (Responsable Inscripto)', async () => {
+            mockCalls(1);
+            await new WsfeService(BASE_CONFIG).issueInvoiceA({ items, buyer });
+            expect(sentCondition()).toBe('1');
+        });
+
+        it('Nota de Crédito A to a monotributista sends condition 6', async () => {
+            mockCalls(3);
+            await new WsfeService(BASE_CONFIG).issueNotaCreditoA({
+                items, buyer, cbteAsociados, taxConditionBuyer: TaxCondition.MONOTAX_PAYER,
+            });
+            expect(sentCondition()).toBe('6');
+        });
+
+        it('Nota de Crédito A without a condition still sends 1 (Responsable Inscripto)', async () => {
+            mockCalls(3);
+            await new WsfeService(BASE_CONFIG).issueNotaCreditoA({ items, buyer, cbteAsociados });
+            expect(sentCondition()).toBe('1');
+        });
+    });
+
     describe('checkStatus (static)', () => {
         it('should return server status', async () => {
             const mockStatusXml = `<?xml version="1.0" encoding="UTF-8"?>

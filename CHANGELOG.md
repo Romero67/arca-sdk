@@ -6,6 +6,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 ## [Unreleased]
 
+### 🐛 Bugfix — Condición IVA del receptor en Factura A y Nota de Crédito A
+
+- `issueInvoiceA` e `issueNotaCreditoA` enviaban siempre `CondicionIVAReceptorId` 1 (Responsable Inscripto). Ahora aceptan `taxConditionBuyer`, para facturar a un monotributista (6) como pide la RG 5003. Sin el parámetro siguen enviando 1.
+
 ### 🐛 Bugfix — Redondeo con alícuotas mezcladas (Factura A/B y sus notas)
 
 - Con ítems de distintas alícuotas (por ejemplo 21% y 10.5%), la suma de `BaseImp`/`Importe` de `AlicIva` podía diferir en un centavo de `ImpNeto`/`ImpIVA` y ARCA rechazaba el comprobante (errores 10061/10051).
