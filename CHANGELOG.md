@@ -4,6 +4,15 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 ---
 
+## [Unreleased]
+
+### 🐛 Bugfix — Redondeo con alícuotas mezcladas (Factura A/B y sus notas)
+
+- Con ítems de distintas alícuotas (por ejemplo 21% y 10.5%), la suma de `BaseImp`/`Importe` de `AlicIva` podía diferir en un centavo de `ImpNeto`/`ImpIVA` y ARCA rechazaba el comprobante (errores 10061/10051).
+- Ahora cada alícuota se redondea una sola vez (con IVA incluido: IVA = total de la alícuota − base) y `ImpNeto`, `ImpIVA` e `ImpTotal` salen de la suma de ese desglose.
+
+---
+
 ## [1.0.4] — 2026-02-27
 
 ### 🐛 Bugfix — Timezone Handling
