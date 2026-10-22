@@ -6,6 +6,13 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### 🐛 Factura A/B (y CAEA) con varias alícuotas: ARCA rechazaba por un centavo
+
+- Con ítems de más de una alícuota (por ejemplo 21% y 10,5%), el SDK redondeaba `ImpNeto` e `ImpIVA` sobre el total del comprobante, pero el `BaseImp` y el `Importe` de cada `AlicIva` por separado. Las sumas podían diferir en un centavo y ARCA rechazaba con las validaciones **10061** (Σ `BaseImp` ≠ `ImpNeto`) y **10051** (Σ `Importe` ≠ `ImpIVA`). Ejemplo: $1000 al 21% + $1000 al 10,5% con IVA incluido mandaba `ImpNeto` 1731.42 con `BaseImp` 826.45 + 904.98 = 1731.43.
+- Medido sobre ~93.000 carritos de un ítem al 21% y otro al 10,5%: fallaba **el 25%**. Con una sola alícuota no fallaba ninguno — salvo con precios netos, donde `ImpTotal` se redondeaba aparte y en algunos casos no era `ImpNeto + ImpIVA` (validación **10048**).
+- Nuevo `calculateVATBreakdown()` en `utils/calculations.ts`: cada alícuota se redondea una sola vez, en centavos; con IVA incluido, el IVA de la alícuota es su total menos su base, así base + IVA es exactamente lo cobrado. `ImpNeto`, `ImpIVA` e `ImpTotal` se derivan de ese desglose (`sumVATBreakdown()`), tanto en `WsfeService` (A, B, M y sus notas) como en la rendición informativa de `CaeaService`.
+- Los comprobantes C no cambian (no informan `AlicIva`). En una comparación de 1620 carritos de una sola alícuota contra la versión anterior, los únicos importes que cambian son 3 que ARCA ya rechazaba por la 10048.
+
 ### 🐛 Padrón A13: dos fallbacks de `getTaxpayer()` devolvían errores de negocio que ARCA nunca mandó
 
 - `parseResponse()` tenía dos ramas (`personaReturn` sin `persona`, y `Body` sin `personaReturn` ni `Fault`) que devolvían strings fijos inventados por el SDK (`'CUIT no encontrado'` y `'No se encontraron datos para el CUIT informado'`). Ninguna de las dos formas se vio nunca contra ARCA real, y la segunda ni tenía test.

@@ -31,6 +31,8 @@ import {
     calculateSubtotal,
     calculateVAT,
     calculateTotal,
+    calculateVATBreakdown,
+    sumVATBreakdown,
     round,
 } from '../utils/calculations';
 import { formatArcaDateOnly } from '../utils/formatArcaDate';
@@ -841,7 +843,11 @@ export class WsfeService {
         let net = total;
         let vat = 0;
 
-        if (request.items && request.items.length > 0) {
+        if (request.vatData && request.vatData.length > 0) {
+            // A/B/M y sus notas: neto, IVA y total salen del mismo desglose que viaja en
+            // AlicIva, así ARCA ve que cierran (validaciones 10061, 10051 y 10048).
+            ({ net, vat, total } = sumVATBreakdown(request.vatData));
+        } else if (request.items && request.items.length > 0) {
             const includesVAT = request.includesVAT || false;
             net = round(calculateSubtotal(request.items, includesVAT));
             vat = round(calculateVAT(request.items, includesVAT));
@@ -1068,31 +1074,7 @@ export class WsfeService {
         taxBase: number;
         amount: number;
     }[] {
-        const byRate = new Map<number, { base: number; amount: number }>();
-
-        items.forEach(item => {
-            const rate = item.vatRate || 0;
-            let netPrice = item.unitPrice;
-
-            if (includesVAT && rate) {
-                netPrice = item.unitPrice / (1 + (rate / 100));
-            }
-
-            const base = item.quantity * netPrice;
-            const amount = base * rate / 100;
-
-            const current = byRate.get(rate) || { base: 0, amount: 0 };
-            byRate.set(rate, {
-                base: current.base + base,
-                amount: current.amount + amount,
-            });
-        });
-
-        return Array.from(byRate.entries()).map(([rate, values]) => ({
-            rate,
-            taxBase: round(values.base),
-            amount: round(values.amount),
-        }));
+        return calculateVATBreakdown(items, includesVAT);
     }
 
     /**

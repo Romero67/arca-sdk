@@ -358,6 +358,136 @@ describe('XML del request', () => {
     });
   });
 
+  // Validaciones 10061 (Σ BaseImp = ImpNeto), 10051 (Σ Importe = ImpIVA) y 10048
+  // (ImpTotal = ImpNeto + ImpTotConc + ImpOpEx + ImpTrib + ImpIVA) del manual wsfev1.
+  // Con más de una alícuota, redondear el neto sobre el total y cada alícuota por
+  // separado hacía que las sumas difieran en un centavo, y ARCA rechazaba.
+  describe('importes con varias alícuotas cierran al centavo', () => {
+    const centavos = (valor: string) => Math.round(Number(valor) * 100);
+    const valores = (xml: string, tag: string) =>
+      [...xml.matchAll(new RegExp(`<ar:${tag}>([^<]*)</ar:${tag}>`, 'g'))].map(m => centavos(m[1]));
+
+    type Item = { quantity: number; unitPrice: number; vatRate: number };
+
+    function importesDe(xml: string) {
+      return {
+        total: valores(xml, 'ImpTotal')[0],
+        neto: valores(xml, 'ImpNeto')[0],
+        iva: valores(xml, 'ImpIVA')[0],
+        tributos: valores(xml, 'ImpTrib')[0],
+        bases: valores(xml, 'BaseImp'),
+        importesIva: valores(xml, 'Importe'),
+      };
+    }
+
+    /** Emite una Factura B por WSFE y devuelve los importes del FECAESolicitar. */
+    async function emitirFacturaB(items: Item[], includesVAT: boolean) {
+      let capturedXml = '';
+      (callArcaApi as any)
+        .mockResolvedValueOnce({ ok: true, text: async () => MOCK_LAST_INVOICE })
+        .mockImplementationOnce((_url: string, options: any) => {
+          capturedXml = options.body;
+          return Promise.resolve({ ok: true, text: async () => MOCK_CAE });
+        });
+
+      await new WsfeService(BASE_CONFIG).issueInvoiceB({
+        items: items.map(i => ({ description: 'Producto', ...i })),
+        buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+        includesVAT,
+      });
+      return importesDe(capturedXml);
+    }
+
+    /** Rinde una Factura A por CAEA y devuelve los importes del FECAEARegInformativo. */
+    async function rendirFacturaA(items: Item[], includesVAT: boolean) {
+      let capturedXml = '';
+      (callArcaApi as any).mockImplementationOnce((_url: string, options: any) => {
+        capturedXml = options.body;
+        return Promise.resolve({ ok: true, text: async () => MOCK_REG_INFORMATIVO });
+      });
+
+      await new CaeaService(BASE_CONFIG).reportCAEAPeriod({
+        caea: '25157992335329',
+        invoices: [{
+          invoiceType: InvoiceType.FACTURA_A,
+          concept: BillingConcept.PRODUCTS,
+          invoiceNumber: 150,
+          date: '2026-08-24',
+          generatedAt: new Date('2026-08-25T01:35:07Z'),
+          items: items.map(i => ({ description: 'Producto', ...i })),
+          buyer: { docType: TaxIdType.CUIT, docNumber: '20987654321' },
+          includesVAT,
+        }],
+      });
+      return importesDe(capturedXml);
+    }
+
+    function expectCierra(importes: ReturnType<typeof importesDe>) {
+      const suma = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+      expect(suma(importes.bases), 'Σ BaseImp debe ser ImpNeto (10061)').toBe(importes.neto);
+      expect(suma(importes.importesIva), 'Σ Importe debe ser ImpIVA (10051)').toBe(importes.iva);
+      expect(importes.neto + importes.iva + importes.tributos, 'ImpTotal (10048)').toBe(importes.total);
+    }
+
+    // 1000 al 21% + 1000 al 10,5%, con IVA incluido: antes salía ImpNeto 1731.42 con
+    // BaseImp 826.45 + 904.98 = 1731.43, y ARCA lo rechazaba.
+    const MIXTO: Item[] = [
+      { quantity: 1, unitPrice: 1000, vatRate: 21 },
+      { quantity: 1, unitPrice: 1000, vatRate: 10.5 },
+    ];
+
+    it('WSFE: 21% + 10,5% con IVA incluido cierra, y el total es lo cobrado', async () => {
+      const importes = await emitirFacturaB(MIXTO, true);
+
+      expectCierra(importes);
+      expect(importes.total).toBe(200000);
+      expect(importes.bases).toEqual([82645, 90498]);
+    });
+
+    it('WSFE: cierra en un barrido de carritos con 21% + 10,5%', async () => {
+      for (let p21 = 101; p21 < 1500; p21 += 97) {
+        for (let p105 = 103; p105 < 1500; p105 += 89) {
+          const importes = await emitirFacturaB(
+            [
+              { quantity: 3, unitPrice: p21 + 0.37, vatRate: 21 },
+              { quantity: 2, unitPrice: p105 + 0.59, vatRate: 10.5 },
+            ],
+            true,
+          );
+
+          expectCierra(importes);
+          expect(importes.total).toBe(Math.round((3 * (p21 + 0.37) + 2 * (p105 + 0.59)) * 100));
+        }
+      }
+    });
+
+    it('WSFE: con precios netos y varias alícuotas, ImpTotal = ImpNeto + ImpIVA', async () => {
+      expectCierra(await emitirFacturaB(
+        [
+          { quantity: 3, unitPrice: 826.45, vatRate: 21 },
+          { quantity: 7, unitPrice: 904.98, vatRate: 10.5 },
+        ],
+        false,
+      ));
+    });
+
+    it('WSFE: una sola alícuota sigue mandando los mismos importes', async () => {
+      expect(await emitirFacturaB([{ quantity: 1, unitPrice: 1210, vatRate: 21 }], true)).toEqual({
+        total: 121000, neto: 100000, iva: 21000, tributos: 0, bases: [100000], importesIva: [21000],
+      });
+      expect(await emitirFacturaB([{ quantity: 1, unitPrice: 1000, vatRate: 21 }], false)).toEqual({
+        total: 121000, neto: 100000, iva: 21000, tributos: 0, bases: [100000], importesIva: [21000],
+      });
+    });
+
+    it('CAEA: la rendición de 21% + 10,5% con IVA incluido también cierra', async () => {
+      const importes = await rendirFacturaA(MIXTO, true);
+
+      expectCierra(importes);
+      expect(importes.total).toBe(200000);
+    });
+  });
+
   // Campo CanMisMonExt y MonId/MonCotiz parametrizables (Manual v4.0, RG 5616).
   describe('moneda extranjera', () => {
     it('emite MonId, MonCotiz y CanMisMonExt en la posición del XSD', async () => {

@@ -16,9 +16,8 @@ import {
     listVatRates,
 } from '../types/wsfe';
 import {
-    calculateSubtotal,
-    calculateVAT,
-    calculateTotal,
+    calculateVATBreakdown,
+    sumVATBreakdown,
     round,
 } from '../utils/calculations';
 import { formatArcaDateOnly, formatArcaTimestamp } from '../utils/formatArcaDate';
@@ -241,35 +240,10 @@ export class CaeaService {
             const includesVAT = inv.includesVAT || false;
 
             if (inv.items && inv.items.length > 0) {
-                net = round(calculateSubtotal(inv.items, includesVAT));
-                vat = round(calculateVAT(inv.items, includesVAT));
-                total = round(calculateTotal(inv.items, includesVAT));
-
-                // Agrupamiento de IVA
-                const byRate = new Map<number, { base: number; amount: number }>();
-                inv.items.forEach(item => {
-                    const rate = item.vatRate || 0;
-                    let netPrice = item.unitPrice;
-
-                    if (includesVAT && rate) {
-                        netPrice = item.unitPrice / (1 + (rate / 100));
-                    }
-
-                    const base = item.quantity * netPrice;
-                    const amount = base * rate / 100;
-
-                    const current = byRate.get(rate) || { base: 0, amount: 0 };
-                    byRate.set(rate, {
-                        base: current.base + base,
-                        amount: current.amount + amount,
-                    });
-                });
-
-                const vatEntries = Array.from(byRate.entries()).map(([rate, values]) => ({
-                    rate,
-                    taxBase: values.base,
-                    amount: values.amount,
-                }));
+                // Neto, IVA y total salen del mismo desglose que viaja en AlicIva, así
+                // cierran al centavo (validaciones 10061, 10051 y 10048 del manual wsfev1).
+                const vatEntries = calculateVATBreakdown(inv.items, includesVAT);
+                ({ net, vat, total } = sumVATBreakdown(vatEntries));
 
                 if (vatEntries.length > 0) {
                     vatXml = '<ar:Iva>';

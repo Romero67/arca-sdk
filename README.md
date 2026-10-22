@@ -891,7 +891,7 @@ Detalle completo en [`tests/integration/README.md`](tests/integration/README.md)
 
 ### Tests disponibles
 
-15 archivos, 307 tests — es lo que corre `bun run test`. **No incluye
+15 archivos, 314 tests — es lo que corre `bun run test`. **No incluye
 `tests/integration/`** (ni `wsfe.integration.test.ts` ni `padron.integration.test.ts`):
 `vitest.config.ts` limita la corrida a `tests/unit/**`, y la integración va aparte con
 `bun run test:integration`.
@@ -904,7 +904,7 @@ Detalle completo en [`tests/integration/README.md`](tests/integration/README.md)
 | Errores | `errors.test.ts` | El diccionario de hints: **54 de sus 55 entradas** están cubiertas — en 39 se verifica el **texto** contra el manual que corresponde, y en los quince faults de WSAA (8) y Padrón A13 (7) restantes, que el `faultstring` llegue al hint (ninguno de los dos servicios devuelve códigos numéricos, así que se reconocen por texto) — con una excepción, `PADRON_INVALID_DOCUMENT`, que sí está confirmado contra ARCA real. La única sin cubrir es `PADRON_ERROR`, que se prueba en `padron.test.ts` |
 | Padrón | `padron.test.ts` | Parsing de respuesta de `getTaxpayer()`, condición IVA, el hint de un fault reconocido del anexo 5.3 (y que uno no documentado no inventa hint) — los dos con HTTP 500 real, no con `ok: true` —, que un 500 sin sobre SOAP real siga degradando a `PADRON_ERROR`, `dummy()` (sin pedir token), `getTaxpayerIdsByDocument()` (varias claves, una sola, ninguna, fault confirmado contra ARCA real) y `getTaxpayerAllowInactive()` (clave INACTIVA sin fallar, `inactiveRelatedKeys`, fault reconocido) |
 | Endpoints | `endpoints.test.ts` | Que homologación de WSAA/WSFE/A13 siga en `afip.gov.ar`, que WSAA/WSFE migraron producción a `arca.gob.ar` y que **A13 no** (sus dos ambientes siguen en `afip.gov.ar`, como documenta su manual) — regresión de los dos endpoints de A13 que no coincidían con el manual (ver la nota de Padrón A13 más arriba, en "Qué está verificado") |
-| XML del request | `request-xml.test.ts` | Orden del `sequence` del XSD en los dos builders, escapado, Tributos, moneda extranjera, rechazos |
+| XML del request | `request-xml.test.ts` | Orden del `sequence` del XSD en los dos builders, escapado, Tributos, moneda extranjera, rechazos, importes con varias alícuotas que cierran al centavo (WSFE y CAEA) |
 | XML / TRA | `xml.test.ts` | Construcción del TRA y sus márgenes de tiempo, parsing de WSAA, validación de CUIT |
 | Fechas | `formatArcaDate.test.ts` | Fecha-calendario vs. instante, conversión a UTC-3, `yyyymmddhhmmss` |
 | Cálculos | `calculations.test.ts` | IVA, subtotales, totales con y sin IVA incluido |
