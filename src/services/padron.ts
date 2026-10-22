@@ -82,12 +82,32 @@ export class PadronService {
             timeout: this.config.timeout || 15000,
         });
 
+        // A13 sends its business faults (e.g. "La Clave (CUIT/CUIL) consultada es
+        // inexistente") with HTTP 500, so read the body before looking at `ok`.
+        const xml = await response.text();
         if (!response.ok) {
-            await handleErrorArcaApi(response);
+            const fault = this.findFault(xml);
+            if (fault) return { error: fault };
+            await handleErrorArcaApi({
+                status: response.status,
+                statusText: response.statusText,
+                text: async () => xml,
+            } as Response);
         }
 
-        const xml = await response.text();
         return this.parseResponse(xml);
+    }
+
+    /** Returns the SOAP faultstring of a response, or undefined when there is none. */
+    private findFault(xml: string): string | undefined {
+        if (!xml) return undefined;
+        try {
+            const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
+            const fault = parser.parse(xml)?.Envelope?.Body?.Fault;
+            return fault ? String(fault.faultstring || 'Error desconocido en ARCA') : undefined;
+        } catch {
+            return undefined;
+        }
     }
 
     /**

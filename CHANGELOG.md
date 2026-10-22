@@ -24,6 +24,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 - `vatRate` acepta 5 (Id 8) y 2.5 (Id 9).
 
+### 🐛 Bugfix — Errores de negocio del Padrón
+
+- El Padrón A13 devuelve sus errores de negocio (por ejemplo "La Clave (CUIT/CUIL) consultada es inexistente") con HTTP 500. Antes se lanzaba "Error HTTP al comunicarse con WSAA"; ahora `getTaxpayer` devuelve `{ error }` con el mensaje de ARCA.
+
 ---
 
 ## [1.0.4] — 2026-02-27

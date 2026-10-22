@@ -3,7 +3,8 @@ import { PadronService } from '../../src/services/padron';
 import { callArcaApi } from '../../src/utils/network';
 import { WsaaService } from '../../src/auth/wsaa';
 
-vi.mock('../../src/utils/network', () => ({
+vi.mock('../../src/utils/network', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/utils/network')>()),
   callArcaApi: vi.fn(),
 }));
 
@@ -99,5 +100,38 @@ describe('PadronService (A13)', () => {
 
     const result = await service.getTaxpayer('22222222222');
     expect(result.error).toBe('CUIT no encontrado');
+  });
+  // A13 sends its business faults with HTTP 500 (verified upstream against homologación).
+  it('returns the SOAP fault as an error when ARCA answers HTTP 500', async () => {
+    const faultXml = `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <soap:Fault>
+      <faultcode>soap:Server</faultcode>
+      <faultstring>La Clave (CUIT/CUIL) consultada es inexistente</faultstring>
+    </soap:Fault>
+  </soap:Body>
+</soap:Envelope>`;
+
+    (callArcaApi as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: async () => faultXml,
+    });
+
+    const result = await service.getTaxpayer('20000000001');
+    expect(result).toEqual({ error: 'La Clave (CUIT/CUIL) consultada es inexistente' });
+  });
+
+  it('still throws an HTTP error when a non-2xx answer carries no SOAP fault', async () => {
+    (callArcaApi as any).mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: async () => '',
+    });
+
+    await expect(service.getTaxpayer('20000000001')).rejects.toThrow('503 Service Unavailable');
   });
 });
