@@ -6,6 +6,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 ## [Unreleased]
 
+### 🐛 Bugfix — Comprador en Factura C y Nota de Crédito C
+
+- `issueInvoiceC` e `issueNotaCreditoC` enviaban siempre `DocTipo` 99 / `DocNro` 0. Ahora aceptan `buyer` opcional para identificar al cliente (por ejemplo, con su CUIT). Sin el parámetro siguen enviando 99/0.
+
 ### 🐛 Bugfix — Condición IVA del receptor en Factura A y Nota de Crédito A
 
 - `issueInvoiceA` e `issueNotaCreditoA` enviaban siempre `CondicionIVAReceptorId` 1 (Responsable Inscripto). Ahora aceptan `taxConditionBuyer`, para facturar a un monotributista (6) como pide la RG 5003. Sin el parámetro siguen enviando 1.

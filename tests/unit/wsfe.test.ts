@@ -351,6 +351,49 @@ describe('WsfeService', () => {
         });
     });
 
+    describe('buyer on Factura C and Nota de Crédito C', () => {
+        const items = [{ description: 'x', quantity: 1, unitPrice: 1000 }];
+        const cbteAsociados = [{ tipo: 11, puntoVenta: 1, numero: 10 }];
+        const sent = () => {
+            const body: string = (callArcaApi as any).mock.calls.at(-1)[1].body;
+            const tag = (t: string) => body.match(new RegExp(`<ar:${t}>([^<]*)</ar:${t}>`))?.[1];
+            return { docType: tag('DocTipo'), docNumber: tag('DocNro'), condition: tag('CondicionIVAReceptorId') };
+        };
+
+        it('Factura C sends the buyer it receives', async () => {
+            mockCalls(11);
+            await new WsfeService(BASE_CONFIG).issueInvoiceC({
+                items,
+                buyer: { docType: TaxIdType.CUIT, docNumber: '30711222333' },
+                taxConditionBuyer: TaxCondition.REGISTERED_TAXPAYER,
+            });
+            expect(sent()).toEqual({ docType: '80', docNumber: '30711222333', condition: '1' });
+        });
+
+        it('Factura C without a buyer still sends 99/0', async () => {
+            mockCalls(11);
+            await new WsfeService(BASE_CONFIG).issueInvoiceC({ items, taxConditionBuyer: TaxCondition.FINAL_CONSUMER });
+            expect(sent()).toEqual({ docType: '99', docNumber: '0', condition: '5' });
+        });
+
+        it('Nota de Crédito C sends the buyer it receives', async () => {
+            mockCalls(13);
+            await new WsfeService(BASE_CONFIG).issueNotaCreditoC({
+                items,
+                cbteAsociados,
+                buyer: { docType: TaxIdType.CUIT, docNumber: '20123456786' },
+                taxConditionBuyer: TaxCondition.MONOTAX_PAYER,
+            });
+            expect(sent()).toEqual({ docType: '80', docNumber: '20123456786', condition: '6' });
+        });
+
+        it('Nota de Crédito C without a buyer still sends 99/0', async () => {
+            mockCalls(13);
+            await new WsfeService(BASE_CONFIG).issueNotaCreditoC({ items, cbteAsociados, taxConditionBuyer: TaxCondition.FINAL_CONSUMER });
+            expect(sent()).toEqual({ docType: '99', docNumber: '0', condition: '5' });
+        });
+    });
+
     describe('receiver VAT condition on Factura A and Nota de Crédito A', () => {
         const items = [{ description: 'x', quantity: 1, unitPrice: 1000, vatRate: 21 }];
         const buyer = { docType: TaxIdType.CUIT, docNumber: '20987654321' };

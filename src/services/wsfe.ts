@@ -187,6 +187,8 @@ export class WsfeService {
         concept?: BillingConcept;
         date?: Date;
         taxConditionBuyer: TaxCondition;
+        /** Identified buyer. Defaults to an unidentified consumidor final (DocTipo 99 / DocNro 0). */
+        buyer?: Buyer;
     }): Promise<CAEResponse> {
         const total = round(calculateTotal(params.items));
 
@@ -195,7 +197,7 @@ export class WsfeService {
             concept: params.concept || BillingConcept.PRODUCTS,
             total,
             date: params.date,
-            buyer: {
+            buyer: params.buyer ?? {
                 docType: TaxIdType.FINAL_CONSUMER,
                 docNumber: '0',
             },
@@ -275,6 +277,8 @@ export class WsfeService {
         date?: Date;
         taxConditionBuyer: TaxCondition;
         cbteAsociados: CbteAsociado[];
+        /** Identified buyer. Defaults to an unidentified consumidor final (DocTipo 99 / DocNro 0). */
+        buyer?: Buyer;
     }): Promise<CAEResponse> {
         const total = round(calculateTotal(params.items));
 
@@ -283,7 +287,7 @@ export class WsfeService {
             concept: params.concept || BillingConcept.PRODUCTS,
             total,
             date: params.date,
-            buyer: {
+            buyer: params.buyer ?? {
                 docType: TaxIdType.FINAL_CONSUMER,
                 docNumber: '0',
             },
